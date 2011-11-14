@@ -1,0 +1,10 @@
+Observables
+===========
+
+Observables is a set of common UI gestures described with Reactive Extensions Observables.
+
+Observables is multi-platform, with C# extension methods, a JS class and jQuery plugin, and an AS3 class.
+
+Observables manages its own interaction state, so only one gestural Observable fires at a time, even though other gestural Observables may have been triggered along the way.
+
+Observables exposes a way to register interaction targets in a global pool, then listen on one Observable for events from any object in the pool.
