@@ -36,11 +36,11 @@ package gestures.multitouch
 					stage.addChild(handle);
 					
 					var child:InteractiveObject = toEnumerable(getObjectsUnderPoint(stage, loc)).
-					lastOrDefault(stage) as InteractiveObject;
+						lastOrDefault(stage) as InteractiveObject;
 					child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_BEGIN,
-						event, 1, true,
-						new Point(event.localX, event.localY),
-						handle, child));
+															event, 1, true,
+															new Point(event.localX, event.localY),
+															handle, child));
 					
 					observables.mouseMove(stage).
 						takeUntil(observables.mouseUp(stage)).
@@ -50,45 +50,45 @@ package gestures.multitouch
 							
 							const handlePosition:Point = new Point(event.stageX, event.stageY);
 							const newChild:InteractiveObject = toEnumerable(getObjectsUnderPoint(stage, handlePosition)).
-							lastOrDefault(stage) as InteractiveObject;
+								lastOrDefault(stage) as InteractiveObject;
 							const local:Point = child.globalToLocal(handlePosition);
 							
 							if(newChild != child)
 							{
 								child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OUT,
-									event, 1, true, local, handle, child));
+																		event, 1, true, local, handle, child));
 								if(child is DisplayObjectContainer &&
 									DisplayObjectContainer(child).contains(newChild) == false)
 								{
 									child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_ROLL_OUT,
-										event, 1, true, local, handle, child));
+																			event, 1, true, local, handle, child));
 									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OVER,
-										event, 1, true, local, handle, child));
+																			   event, 1, true, local, handle, child));
 									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_ROLL_OVER,
-										event, 1, true, local, handle, child));
+																			   event, 1, true, local, handle, child));
 								}
 								else
 								{
 									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OVER,
-										event, 1, true, local, handle, child));
+																			   event, 1, true, local, handle, child));
 								}
 								child = newChild;
 							}
 							
 							child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_MOVE,
-								event, 1, true, local, handle, child));
-							
+																	event, 1, true, local, handle, child));
+						
 						},
 						function():void {
 							
 							const local:Point = child.globalToLocal(new Point(handle.x + (handle.width * 0.5),
-								handle.y + (handle.width * 0.5)));
+																			  handle.y + (handle.width * 0.5)));
 							
 							child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_END,
-								event, 1, true,
-								local, handle, child));
+																	event, 1, true,
+																	local, handle, child));
 							
-							if(stage.contains(handle)) stage.removeChild(handle);
+							if(stage.contains(handle))stage.removeChild(handle);
 							
 							Mouse.show();
 						});
@@ -146,7 +146,7 @@ package gestures.multitouch
 				const handles:Array = makeHandles(2).
 					map(function(handle:DisplayObject, i:int, ... args):DisplayObject {
 						
-						const loc:Point = new Point(pos.x - (handle.width * 0.5), pos.y - (handle.height * 0.5));
+						const loc:Point = new Point(pos.x - (handle.width * 0.5) + (startDistance * i), pos.y - (handle.height * 0.5));
 						
 						const child:InteractiveObject = toEnumerable(getObjectsUnderPoint(stage, loc)).
 							lastOrDefault(stage) as InteractiveObject;
@@ -163,7 +163,7 @@ package gestures.multitouch
 							}
 						}
 						
-						handle.x = loc.x + (startDistance * i);
+						handle.x = loc.x;
 						handle.y = loc.y;
 						
 						child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_BEGIN,
