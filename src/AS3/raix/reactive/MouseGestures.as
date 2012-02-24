@@ -24,8 +24,10 @@ package raix.reactive
 	import flash.events.*;
 	import flash.utils.*;
 	
-	public class ObservableGestures
+	public class MouseGestures extends GesturesBase
 	{
+		public static const global:MouseGestures = new MouseGestures();
+		
 		protected const globalCanceleables:Dictionary = new Dictionary(false);
 		
 		public function register(target:IEventDispatcher):IEventDispatcher
@@ -54,9 +56,6 @@ package raix.reactive
 				a.push(mouseTripleDrag(target).subscribeWith(tripleDragObs));
 				
 				a.push(mouseWheel(target).subscribeWith(wheelObs));
-				
-				a.push(keyDown(target).subscribeWith(keyDownObs));
-				a.push(keyUp(target).subscribeWith(keyUpObs));
 			}
 			
 			return target;
@@ -90,9 +89,6 @@ package raix.reactive
 		protected const doubleDragObs:ISubject = new Subject();
 		protected const tripleDragObs:ISubject = new Subject();
 		protected const wheelObs:ISubject = new Subject();
-		
-		protected const keyDownObs:ISubject = new Subject();
-		protected const keyUpObs:ISubject = new Subject();
 		
 		public function get up():IObservable
 		{
@@ -168,8 +164,6 @@ package raix.reactive
 		{
 			return wheelObs.asObservable();
 		}
-		
-		protected const localCancelables:Dictionary = new Dictionary(false);
 		
 		public function mouseUp(target:IEventDispatcher):IObservable
 		{
@@ -343,22 +337,6 @@ package raix.reactive
 						 'tripleDrag');
 		}
 		
-		public function keyDown(target:IEventDispatcher):IObservable
-		{
-			return getObs(target, 'keyDown') ||
-				cacheObs(target,
-						 Observable.fromEvent(target, KeyboardEvent.KEY_DOWN),
-						 'keyDown');
-		}
-		
-		public function keyUp(target:IEventDispatcher):IObservable
-		{
-			return getObs(target, 'keyUp') ||
-				cacheObs(target,
-						 Observable.fromEvent(target, KeyboardEvent.KEY_UP),
-						 'keyUp');
-		}
-		
 		public function mouseWheel(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'wheel') ||
@@ -381,17 +359,6 @@ package raix.reactive
 						 takeUntil(Observable.timer(800, 0)).
 						 repeat(),
 						 'downGenerator');
-		}
-		
-		protected function getObs(target:IEventDispatcher, name:String):IObservable
-		{
-			return localCancelables[target] ? localCancelables[target][name] : null;
-		}
-		
-		protected function cacheObs(target:IEventDispatcher, obs:IObservable, name:String):IObservable
-		{
-			localCancelables[target] ||= {};
-			return localCancelables[target][name] ||= obs;
 		}
 	}
 }
