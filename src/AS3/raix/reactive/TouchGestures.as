@@ -157,24 +157,7 @@ package raix.reactive
 		{
 			return getObs(target, 'touchClick') ||
 				cacheObs(target,
-						 touchBegin(target).
-						 mapMany(function(begin:TouchEvent):IObservable {
-							 return Observable.timer(100, 0).
-								 first().
-								 mapMany(function(... args):IObservable {
-									 return touchEnd(target);
-								 }).
-								 map(function(end:TouchEvent):TouchEvent {
-									 return new TouchEvent(TouchEvent.TOUCH_TAP,
-														   true, false, 0, true,
-														   end.localX, end.localY,
-														   end.sizeX, end.sizeY, begin.pressure,
-														   begin.relatedObject, end.ctrlKey,
-														   end.altKey, end.shiftKey, end.commandKey,
-														   end.controlKey, end.timestamp,
-														   end.touchIntent, null, false);
-								 });
-						 }),
+						 touchBegin(target).takeUntil(touchEnd(target)),
 						 'touchClick');
 		}
 		
