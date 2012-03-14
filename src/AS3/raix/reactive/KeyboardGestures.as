@@ -63,17 +63,15 @@ package raix.reactive
 		public function keyDown(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'keyDown') ||
-				cacheObs(target,
-						 Observable.fromEvent(target, KeyboardEvent.KEY_DOWN),
-						 'keyDown');
+				cacheObs(target, 'keyDown',
+						 Observable.fromEvent(target, KeyboardEvent.KEY_DOWN));
 		}
 		
 		public function keyUp(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'keyUp') ||
-				cacheObs(target,
-						 Observable.fromEvent(target, KeyboardEvent.KEY_UP),
-						 'keyUp');
+				cacheObs(target, 'keyUp',
+						 Observable.fromEvent(target, KeyboardEvent.KEY_UP));
 		}
 	
 	}

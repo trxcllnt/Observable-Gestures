@@ -168,131 +168,114 @@ package raix.reactive
 		public function mouseUp(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'up') ||
-				cacheObs(target,
-						 Observable.
-						 fromEvent(target, MouseEvent.MOUSE_UP).
-						 peek(function(event:Event):void {event.stopPropagation();}),
-						 'up');
+				cacheObs(target, 'up',
+						 Observable.fromEvent(target, MouseEvent.MOUSE_UP).
+						 peek(function(event:Event):void {event.stopPropagation();}));
 		}
 		
 		public function mouseOver(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'over') ||
-				cacheObs(target,
-						 Observable.
-						 fromEvent(target, MouseEvent.MOUSE_OVER).
-						 peek(function(event:Event):void {event.stopPropagation();}),
-						 'over');
+				cacheObs(target, 'over',
+						 Observable.fromEvent(target, MouseEvent.MOUSE_OVER).
+						 peek(function(event:Event):void {event.stopPropagation();}));
 		}
 		
 		public function mouseOut(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'out') ||
-				cacheObs(target,
-						 Observable.
-						 fromEvent(target, MouseEvent.MOUSE_OUT).
-						 peek(function(event:Event):void {event.stopPropagation();}),
-						 'out');
+				cacheObs(target, 'out',
+						 Observable.fromEvent(target, MouseEvent.MOUSE_OUT).
+						 peek(function(event:Event):void {event.stopPropagation();}));
 		}
 		
 		public function mouseRollOver(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'rollOver') ||
-				cacheObs(target,
-						 Observable.
-						 fromEvent(target, MouseEvent.ROLL_OVER).
-						 peek(function(event:Event):void {event.stopPropagation();}),
-						 'rollOver');
+				cacheObs(target, 'rollOver',
+						 Observable.fromEvent(target, MouseEvent.ROLL_OVER).
+						 peek(function(event:Event):void {event.stopPropagation();}));
 		}
 		
 		public function mouseRollOut(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'rollOut') ||
-				cacheObs(target,
-						 Observable.
-						 fromEvent(target, MouseEvent.ROLL_OUT).
-						 peek(function(event:Event):void {event.stopPropagation();}),
-						 'rollOut');
+				cacheObs(target, 'rollOut',
+						 Observable.fromEvent(target, MouseEvent.ROLL_OUT).
+						 peek(function(event:Event):void {event.stopPropagation();}));
 		}
 		
 		public function mouseMove(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'move') ||
-				cacheObs(target,
-						 Observable.
-						 fromEvent(target, MouseEvent.MOUSE_MOVE).
-						 peek(function(event:Event):void {event.stopPropagation();}),
-						 'move');
+				cacheObs(target, 'move',
+						 Observable.fromEvent(target, MouseEvent.MOUSE_MOVE).
+						 peek(function(event:Event):void {event.stopPropagation();}));
 		}
 		
 		public function mouseDown(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'down') ||
-				cacheObs(target,
+				cacheObs(target, 'down',
 						 downGenerator(target).
 						 filter(function(tuple:Object):Boolean {
 							 return tuple.val == 1;
 						 }).
 						 map(function(tuple:Object):MouseEvent {
 							 return tuple.event;
-						 }),
-						 'down');
+						 }));
 		}
 		
 		public function mouseDoubleDown(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'doubleDown') ||
-				cacheObs(target,
+				cacheObs(target, 'doubleDown',
 						 downGenerator(target).
 						 filter(function(tuple:Object):Boolean {
 							 return tuple.val == 2;
 						 }).
 						 map(function(tuple:Object):MouseEvent {
 							 return tuple.event;
-						 }),
-						 'doubleDown');
+						 }));
 		}
 		
 		public function mouseTripleDown(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'tripleDown') ||
-				cacheObs(target,
+				cacheObs(target, 'tripleDown',
 						 downGenerator(target).
 						 filter(function(tuple:Object):Boolean {
 							 return tuple.val == 3;
 						 }).
 						 map(function(tuple:Object):MouseEvent {
 							 return tuple.event;
-						 }),
-						 'tripleDown');
+						 }));
 		}
 		
 		public function mouseClick(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'click') ||
-				cacheObs(target,
-						 Observable.
-						 fromEvent(target, MouseEvent.CLICK).
-						 peek(function(event:Event):void {event.stopPropagation();}),
-						 'click');
+				cacheObs(target, 'click',
+						 Observable.fromEvent(target, MouseEvent.CLICK).
+						 peek(function(event:Event):void {event.stopPropagation();}));
 		}
 		
 		public function mouseDoubleClick(target:IEventDispatcher):IObservable
 		{
-			return getObs(target, 'doubleClick') || cacheObs(target,
-															 mouseClick(target).
-															 timeInterval().
-															 filter(function(ti:TimeInterval):Boolean {
-																 return ti.interval > 0 && ti.interval < 400;
-															 }).
-															 removeTimeInterval(),
-															 'doubleClick');
+			return getObs(target, 'doubleClick') ||
+				cacheObs(target, 'doubleClick',
+						 mouseClick(target).
+						 timeInterval().
+						 filter(function(ti:TimeInterval):Boolean {
+							 return ti.interval > 0 && ti.interval < 400;
+						 }).
+						 removeTimeInterval());
 		}
 		
 		public function mouseDrag(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'drag') ||
-				cacheObs(target,
+				cacheObs(target, 'drag',
 						 mouseDown(target).
 						 mapMany(function(me:MouseEvent):IObservable {
 							 return mouseMove(target).timestamp().
@@ -301,14 +284,13 @@ package raix.reactive
 												   return (left.timestamp > right.timestamp ? left.value : right.value) as MouseEvent;
 											   }).
 											   takeUntil(up);
-						 }),
-						 'drag');
+						 }));
 		}
 		
 		public function mouseDoubleDrag(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'doubleDrag') ||
-				cacheObs(target,
+				cacheObs(target, 'doubleDrag',
 						 mouseDoubleDown(target).
 						 mapMany(function(me:MouseEvent):IObservable {
 							 return mouseMove(target).timestamp().
@@ -317,14 +299,13 @@ package raix.reactive
 												   return (left.timestamp > right.timestamp ? left.value : right.value) as MouseEvent;
 											   }).
 											   takeUntil(up);
-						 }),
-						 'doubleDrag');
+						 }));
 		}
 		
 		public function mouseTripleDrag(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'tripleDrag') ||
-				cacheObs(target,
+				cacheObs(target, 'tripleDrag',
 						 mouseTripleDown(target).
 						 mapMany(function(me:MouseEvent):IObservable {
 							 return mouseMove(target).timestamp().
@@ -333,22 +314,20 @@ package raix.reactive
 												   return (left.timestamp > right.timestamp ? left.value : right.value) as MouseEvent;
 											   }).
 											   takeUntil(up);
-						 }),
-						 'tripleDrag');
+						 }));
 		}
 		
 		public function mouseWheel(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'wheel') ||
-				cacheObs(target,
-						 Observable.fromEvent(target, MouseEvent.MOUSE_WHEEL),
-						 'wheel');
+				cacheObs(target, 'wheel',
+						 Observable.fromEvent(target, MouseEvent.MOUSE_WHEEL));
 		}
 		
 		protected function downGenerator(target:IEventDispatcher):IObservable
 		{
 			return getObs(target, 'downGenerator') ||
-				cacheObs(target,
+				cacheObs(target, 'downGenerator',
 						 Observable.fromEvent(target, MouseEvent.MOUSE_DOWN).
 						 peek(function(event:Event):void {
 							 event.stopPropagation();
@@ -357,8 +336,7 @@ package raix.reactive
 							 return {val: state.val + 1, event: evt};
 						 }, {val: 0, event: null}, true).
 						 takeUntil(Observable.timer(800, 0)).
-						 repeat(),
-						 'downGenerator');
+						 repeat());
 		}
 	}
 }

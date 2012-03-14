@@ -12,7 +12,7 @@ package raix.reactive
 			return localCancelables[target] ? localCancelables[target][name] : null;
 		}
 		
-		protected function cacheObs(target:IEventDispatcher, obs:IObservable, name:String):IObservable
+		protected function cacheObs(target:IEventDispatcher, name:String, obs:IObservable):IObservable
 		{
 			localCancelables[target] ||= {};
 			return localCancelables[target][name] ||= obs;
