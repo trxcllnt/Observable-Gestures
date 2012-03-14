@@ -160,17 +160,7 @@ package raix.reactive
 							bounds = rect;
 						}));
 						
-						const moveObservable:IObservable = Observable.fromEvent(stage, TouchEvent.TOUCH_MOVE).
-							map(function(move:TouchEvent):TouchPoint {
-								return TouchPoint.fromEvent(move);
-							}).
-							scan(function(a:TouchPoint, b:TouchPoint):TouchPoint {
-								const delta:Point = b.subtract(a);
-								b.previous = a;
-								b.speed.x = delta.x * 2.5;
-								b.speed.y = delta.y * 2.5;
-								return b;
-							}, begin, true).
+						const moveObservable:IObservable = touchMove(stage, begin).
 							takeUntil(Observable.fromEvent(stage, TouchEvent.TOUCH_END).
 									  merge(touchTransaction(startObject)));
 						
@@ -306,20 +296,14 @@ package raix.reactive
 				map(function(move:TouchEvent):TouchPoint {
 					return new TouchPoint(move.stageX, move.stageY, move.target, move.touchPointID);
 				}).
-				timeInterval().
-				scan(function(a:TimeInterval, b:TimeInterval):TimeInterval {
-					const p1:TouchPoint = a.value as TouchPoint;
-					const p2:TouchPoint = b.value as TouchPoint;
-					const delta:Point = p2.subtract(p1);
-					p2.previous = p1;
-					p2.speed.x = Math.max(Math.min(delta.x / (Math.max(b.interval, 1) / 10), 35), -35);
-					p2.speed.y = Math.max(Math.min(delta.y / (Math.max(b.interval, 1) / 10), 35), -35);
-					
-//					trace(p2.speed.x, (Math.max(b.interval, 1) / 10));
+				scan(function(a:TouchPoint, b:TouchPoint):TouchPoint {
+					const delta:Point = b.subtract(a);
+					b.previous = a;
+					b.speed.x = delta.x * 2.5;
+					b.speed.y = delta.y * 2.5;
 					
 					return b;
-				}, new TimeInterval(firstPoint, 0), firstPoint != null).
-				removeTimeInterval();
+				}, firstPoint, firstPoint != null);
 		}
 		
 		public function doublePan(target:IEventDispatcher):IObservable
@@ -407,7 +391,7 @@ package raix.reactive
 								return new ExpandData(c1, c2, delta);
 							}).
 							finallyAction(function():void {
-								start = null
+								start.length = 0;
 								terminator.cancel();
 							}))
 		}
@@ -463,51 +447,59 @@ package raix.reactive
 								return new ExpandData(c1, c2, delta);
 							}).
 							finallyAction(function():void {
-								start = null;
+								start.length = 0;
 								terminator.cancel();
 							}));
 		}
 		
 		protected function touchTransaction(target:IEventDispatcher):IObservable
 		{
-			return getObs(target, 'beginGenerator') ||
-				cacheObs(target, 'beginGenerator',
-						 Observable.createWithCancelable(function(observer:IObserver):ICancelable {
-							 const composite:CompositeCancelable = new CompositeCancelable();
-							 const touchPoints:Array = [];
-							 
-							 composite.add(Observable.fromEvent(target, TouchEvent.TOUCH_BEGIN).
-										   filter(function(begin:TouchEvent):Boolean {
-											   return touchPoints.every(function(point:TouchPoint, ... args):Boolean {
-												   return point.id != begin.touchPointID;
-											   });
-										   }).
-										   subscribe(function(begin:TouchEvent):void {
-											   touchPoints.push(new TouchPoint(begin.stageX, begin.stageY, begin.target as IEventDispatcher, begin.touchPointID));
-											   observer.onNext(touchPoints.concat());
-										   }));
-							 
-							 composite.add(Observable.fromEvent(stage, TouchEvent.TOUCH_END).
-										   filter(function(end:TouchEvent):Boolean {
-											   return touchPoints.some(function(point:TouchPoint, idx:int, ... args):Boolean {
-												   return point.id == end.touchPointID;
-											   });
-										   }).
-										   map(function(end:TouchEvent):int {
-											   var i:int = -1;
-											   touchPoints.some(function(point:TouchPoint, idx:int, ... args):Boolean {
-												   i = idx;
-												   return point.id == end.touchPointID;
-											   });
-											   return i;
-										   }).
-										   subscribe(function(i:int):void {
-											   touchPoints.splice(i, 1);
-											   observer.onNext(touchPoints.concat());
-										   }));
-							 
-							 return composite;
-						 }));
+			var obs:IObservable = getObs(target, 'beginGenerator');
+			
+			if(obs)
+				return obs;
+			
+			const subject:ISubject = new Subject();
+			
+			Observable.createWithCancelable(function(observer:IObserver):ICancelable {
+				const composite:CompositeCancelable = new CompositeCancelable();
+				const touchPoints:Array = [];
+				
+				composite.add(Observable.fromEvent(target, TouchEvent.TOUCH_BEGIN).
+							  filter(function(begin:TouchEvent):Boolean {
+								  return touchPoints.every(function(point:TouchPoint, ... args):Boolean {
+									  return point.id != begin.touchPointID;
+								  });
+							  }).
+							  subscribe(function(begin:TouchEvent):void {
+								  touchPoints.push(new TouchPoint(begin.stageX, begin.stageY, begin.target as IEventDispatcher, begin.touchPointID));
+								  observer.onNext(touchPoints.concat());
+							  }));
+				
+				composite.add(Observable.fromEvent(stage, TouchEvent.TOUCH_END).
+							  filter(function(end:TouchEvent):Boolean {
+								  return touchPoints.some(function(point:TouchPoint, idx:int, ... args):Boolean {
+									  return point.id == end.touchPointID;
+								  });
+							  }).
+							  map(function(end:TouchEvent):int {
+								  var i:int = -1;
+								  touchPoints.some(function(point:TouchPoint, idx:int, ... args):Boolean {
+									  i = idx;
+									  return point.id == end.touchPointID;
+								  });
+								  return i;
+							  }).
+							  subscribe(function(i:int):void {
+								  touchPoints.splice(i, 1);
+								  observer.onNext(touchPoints.concat());
+							  }));
+				
+				return composite;
+			}).
+			subscribeWith(subject);
+			
+			return cacheObs(target, 'beginGenerator', subject);
 		}
 		
 		protected function dispatchMomentum(observer:IObserver, start:TouchPoint,
