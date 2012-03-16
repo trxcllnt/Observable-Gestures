@@ -39,7 +39,10 @@ package gestures.multitouch
 			const mouseDown:IObservable = Observable.fromEvent(stage, MouseEvent.MOUSE_DOWN);
 			
 			mouseDown.filter(function(event:MouseEvent):Boolean {
-				return !event.shiftKey && !event.altKey && !event.controlKey && !event.commandKey;
+				return !(event.shiftKey || event.altKey ||
+					(event.hasOwnProperty('ctrlKey') && event.ctrlKey) ||
+					(event.hasOwnProperty('controlKey') && event.controlKey) ||
+					(event.hasOwnProperty('commandKey') && event.commandKey));
 			}).
 			subscribe(getHandlesAction(1, stage, mouseObservables, keyboardObservables));
 			
@@ -51,8 +54,9 @@ package gestures.multitouch
 					return e1 && e2 &&
 						e1.keyCode == e2.keyCode &&
 						e1.shiftKey == e2.shiftKey &&
-						e1.controlKey == e2.controlKey &&
-						e1.commandKey == e2.commandKey;
+						(e1.hasOwnProperty('ctrlKey') && e2.hasOwnProperty('ctrlKey') && e1.ctrlKey == e2.ctrlKey) &&
+						(e1.hasOwnProperty('controlKey') && e2.hasOwnProperty('controlKey') && e1.controlKey == e2.controlKey) &&
+						(e1.hasOwnProperty('commandKey') && e2.hasOwnProperty('commandKey') && e1.commandKey == e2.commandKey);
 				}).
 				mapMany(function(event:KeyboardEvent):IObservable {
 					return mouseDown;
@@ -197,38 +201,38 @@ package gestures.multitouch
 							if(newChild != child)
 							{
 								child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OUT,
-																		moveEvent, handle.id, 
-																		moveType == 'second' ? i == 1 : i == 0, 
+																		moveEvent, handle.id,
+																		moveType == 'second' ? i == 1 : i == 0,
 																		local, handle, child));
 								if(child is DisplayObjectContainer &&
 									DisplayObjectContainer(child).contains(newChild) == false)
 								{
 									child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_ROLL_OUT,
-																			moveEvent, handle.id, 
-																			moveType == 'second' ? i == 1 : i == 0, 
+																			moveEvent, handle.id,
+																			moveType == 'second' ? i == 1 : i == 0,
 																			local, handle, child));
 									local = newChild.globalToLocal(handlePosition);
 									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OVER,
-																			   moveEvent, handle.id, 
-																			   moveType == 'second' ? i == 1 : i == 0, 
+																			   moveEvent, handle.id,
+																			   moveType == 'second' ? i == 1 : i == 0,
 																			   local, handle, child));
 									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_ROLL_OVER,
-																			   moveEvent, handle.id, 
-																			   moveType == 'second' ? i == 1 : i == 0, 
+																			   moveEvent, handle.id,
+																			   moveType == 'second' ? i == 1 : i == 0,
 																			   local, handle, child));
 								}
 								else
 								{
 									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OVER,
-																			   moveEvent, handle.id, 
-																			   moveType == 'second' ? i == 1 : i == 0, 
+																			   moveEvent, handle.id,
+																			   moveType == 'second' ? i == 1 : i == 0,
 																			   local, handle, child));
 								}
 								children[i] = child = newChild;
 							}
 							
 							const e:TouchEvent = translateTouchEvent(TouchEvent.TOUCH_MOVE,
-																	 moveEvent, handle.id, 
+																	 moveEvent, handle.id,
 																	 moveType == 'second' ? i == 1 : i == 0,
 																	 handlePosition, handle, child);
 							
@@ -310,8 +314,10 @@ package gestures.multitouch
 								  local.x, local.y,
 								  handle.width, handle.height, 1,
 								  relatedObject, event.ctrlKey, event.altKey,
-								  event.shiftKey, event.commandKey,
-								  event.controlKey, getTimer());
+								  event.shiftKey,
+								  event.hasOwnProperty('commandKey') ? event.commandKey : event.ctrlKey,
+								  event.hasOwnProperty('controlKey') ? event.controlKey : event.ctrlKey,
+								  getTimer());
 		}
 	}
 }

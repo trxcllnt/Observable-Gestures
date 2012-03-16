@@ -142,67 +142,48 @@ package raix.reactive
 				});
 		}
 		
-		public function singleTouchMove(startObject:DisplayObject = null, boundaries:* = null, momentum:Boolean = true):IObservable
+		public function oneFingerSwipe(target:DisplayObject = null):IObservable
 		{
-			startObject ||= stage;
-			boundaries ||= startObject.parent ? startObject.parent.getBounds(stage) : stage.getBounds(stage);
-			
-			const boundsObs:IObservable = (boundaries is Rectangle) ? Observable.value(boundaries) : IObservable(boundaries);
-			
-			return Observable.createWithCancelable(function(observer:IObserver):ICancelable {
-				
-				const composite:CompositeCancelable = new CompositeCancelable();
-				
-				const beginObservable:IObservable = singleTouchBegin(startObject).
-					peek(function(begin:TouchPoint):void {
-						var bounds:Rectangle;
-						composite.add(boundsObs.subscribe(function(rect:Rectangle):void {
-							bounds = rect;
-						}));
-						
-						const moveObservable:IObservable = touchMove(stage, begin).
-							takeUntil(Observable.fromEvent(stage, TouchEvent.TOUCH_END).
-									  merge(touchTransaction(startObject)));
-						
-						var lastPoint:TouchPoint = new TouchPoint();
-						var timeoutCancelable:ICancelable;
-						
-						const moveObserver:IObserver = Observer.create(function(point:TouchPoint):void {
-							if(timeoutCancelable)
-								timeoutCancelable.cancel();
-							
-							timeoutCancelable = Observable.interval(60).take(1).
-								subscribe(null, function():void {
-									lastPoint.speed.x = 0;
-									lastPoint.speed.y = 0;
-								});
-							
-							lastPoint = point;
-							observer.onNext(point);
-						},
-						function():void {
-							if(timeoutCancelable)
-							{
-								timeoutCancelable.cancel();
-							}
-							
-							if(momentum && lastPoint.speed.length > 0)
-							{
-								dispatchMomentum(observer, lastPoint, startObject.getBounds(startObject), bounds);
-							}
-							else
-							{
-								observer.onCompleted();
-							}
-						});
-						
-						composite.add(moveObservable.subscribeWith(moveObserver));
-					});
-				
-				composite.add(beginObservable.publish().connect());
-				
-				return composite;
-			});
+			target ||= stage;
+			return getObs(target, 'oneFingerSwipe') ||
+				cacheObs(target, 'oneFingerSwipe',
+						 Observable.createWithCancelable(function(observer:IObserver):ICancelable {
+							 
+							 const composite:CompositeCancelable = new CompositeCancelable();
+							 
+							 composite.add(singleTouchBegin(target).
+										   subscribe(function(begin:TouchPoint):void {
+											   
+											   const moveObservable:IObservable = touchMove(stage, begin).
+												   takeUntil(Observable.fromEvent(stage, TouchEvent.TOUCH_END).
+															 merge(touchTransaction(target)));
+											   
+											   var lastPoint:TouchPoint = new TouchPoint();
+											   var timeoutCancelable:ICancelable;
+											   
+											   const moveObserver:IObserver = Observer.create(function(point:TouchPoint):void {
+												   if(timeoutCancelable)
+													   timeoutCancelable.cancel();
+												   
+												   timeoutCancelable = Observable.interval(60).take(1).
+													   subscribe(null, function():void {
+														   lastPoint.speed.x = 0;
+														   lastPoint.speed.y = 0;
+													   });
+												   
+												   lastPoint = point;
+												   observer.onNext(point);
+											   },
+											   function():void {
+												   if(timeoutCancelable)
+													   timeoutCancelable.cancel();
+												   observer.onCompleted();
+											   });
+											   
+											   composite.add(moveObservable.subscribeWith(moveObserver));
+										   }));
+							 return composite;
+						 }));
 		}
 		
 		public function doubleTouchMove(target:IEventDispatcher):IObservable
@@ -210,9 +191,13 @@ package raix.reactive
 			return doubleTouchBegin(target).
 				mapMany(function(points:Array):IObservable {
 					const moveObsFactory:Function = function(point:TouchPoint):IObservable {
+						var latest:TouchPoint = new TouchPoint();
 						return touchMove(stage, point).
 							filter(function(move:TouchPoint):Boolean {
 								return move.id == point.id;
+							}).
+							peek(function(point:TouchPoint):void {
+								latest = point;
 							}).
 							takeUntil(touchTransaction(target));
 					};
@@ -299,8 +284,8 @@ package raix.reactive
 				scan(function(a:TouchPoint, b:TouchPoint):TouchPoint {
 					const delta:Point = b.subtract(a);
 					b.previous = a;
-					b.speed.x = delta.x * 2.5;
-					b.speed.y = delta.y * 2.5;
+					b.speed.x = delta.x * 2.5; // magic
+					b.speed.y = delta.y * 2.5; // magic
 					
 					return b;
 				}, firstPoint, firstPoint != null);
@@ -351,11 +336,6 @@ package raix.reactive
 			
 			var start:Array = [];
 			
-			const terminator:ICancelable = touchTransaction(target).
-				subscribe(function(... args):void {
-					start.length = 0;
-				});
-			
 			return cacheObs(target, 'zoom',
 							doubleTouchMove(target).
 							scan(function(both:Array, curr:Array):Array {
@@ -390,10 +370,10 @@ package raix.reactive
 								
 								return new ExpandData(c1, c2, delta);
 							}).
+							takeUntil(touchEnd(stage)).
 							finallyAction(function():void {
 								start.length = 0;
-								terminator.cancel();
-							}))
+							}));
 		}
 		
 		public function pinch(target:IEventDispatcher):IObservable
@@ -406,11 +386,6 @@ package raix.reactive
 			}
 			
 			var start:Array = [];
-			
-			const terminator:ICancelable = touchTransaction(target).
-				subscribe(function(... args):void {
-					start.length = 0;
-				});
 			
 			return cacheObs(target, 'pinch',
 							doubleTouchMove(target).
@@ -446,9 +421,9 @@ package raix.reactive
 								
 								return new ExpandData(c1, c2, delta);
 							}).
+							takeUntil(touchEnd(stage)).
 							finallyAction(function():void {
 								start.length = 0;
-								terminator.cancel();
 							}));
 		}
 		
