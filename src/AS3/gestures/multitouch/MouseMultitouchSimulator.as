@@ -11,7 +11,7 @@ package gestures.multitouch
 	
 	public class MouseMultitouchSimulator
 	{
-		public function MouseMultitouchSimulator(stage:Stage, mouseObservables:MouseGestures, keyboardObservables:KeyboardGestures)
+		public function MouseMultitouchSimulator(stage:Stage)
 		{
 			// If there's not at least one listener for these events,
 			// the Flash Player doesn't correctly calculate the stageX
@@ -26,274 +26,231 @@ package gestures.multitouch
 			stage.addEventListener(TouchEvent.TOUCH_ROLL_OVER, nullListener);
 			stage.addEventListener(TouchEvent.TOUCH_TAP, nullListener);
 			
-			initialize(stage, mouseObservables, keyboardObservables);
+			this.stage = stage;
+			
+			initialize(stage);
 		}
+		
+		protected var stage:Stage;
 		
 		[Embed(source = "touch_point_handle_32x32.png")]
 		private const handleImage:Class;
 		
-		protected function initialize(stage:Stage, mouseObservables:MouseGestures, keyboardObservables:KeyboardGestures):void
+		protected function initialize(stage:Stage):void
 		{
-			keyboardObservables.register(mouseObservables.register(stage));
-			
 			const mouseDown:IObservable = Observable.fromEvent(stage, MouseEvent.MOUSE_DOWN);
+			const mouseUp:IObservable = Observable.fromEvent(stage, MouseEvent.MOUSE_UP);
+			const mouseMove:IObservable = Observable.fromEvent(stage, MouseEvent.MOUSE_MOVE);
+			const keyDown:IObservable = Observable.fromEvent(stage, KeyboardEvent.KEY_DOWN);
+			const keyUp:IObservable = Observable.fromEvent(stage, KeyboardEvent.KEY_UP);
 			
-			mouseDown.filter(function(event:MouseEvent):Boolean {
-				return !(event.shiftKey || event.altKey ||
-					(event.hasOwnProperty('ctrlKey') && event.ctrlKey) ||
-					(event.hasOwnProperty('controlKey') && event.controlKey) ||
-					(event.hasOwnProperty('commandKey') && event.commandKey));
-			}).
-			subscribe(getHandlesAction(1, stage, mouseObservables, keyboardObservables));
+			const realHandle:Handle = new Handle(new handleImage());
+			const mockHandle:Handle = new Handle(new handleImage());
+			const center:Point = new Point();
 			
-			const shiftThenMouseDown:IObservable = keyboardObservables.keyDown(stage).
-				filter(function(event:KeyboardEvent):Boolean {
-					return event.keyCode == Keyboard.SHIFT;
-				}).
-				distinctUntilChanged(function(e1:KeyboardEvent, e2:KeyboardEvent):Boolean {
-					return e1 && e2 &&
-						e1.keyCode == e2.keyCode &&
-						e1.shiftKey == e2.shiftKey &&
-						(e1.hasOwnProperty('ctrlKey') && e2.hasOwnProperty('ctrlKey') && e1.ctrlKey == e2.ctrlKey) &&
-						(e1.hasOwnProperty('controlKey') && e2.hasOwnProperty('controlKey') && e1.controlKey == e2.controlKey) &&
-						(e1.hasOwnProperty('commandKey') && e2.hasOwnProperty('commandKey') && e1.commandKey == e2.commandKey);
-				}).
-				mapMany(function(event:KeyboardEvent):IObservable {
-					return mouseDown;
-				});
+			var control:Boolean = false;
+			var multi:Boolean = false;
+			var moved:Boolean = false;
+			var down:Boolean = false;
 			
-			shiftThenMouseDown.
-				filter(function(event:MouseEvent):Boolean {
-					return event.shiftKey && !event.altKey && !(event.commandKey || event.controlKey);
-				}).
-				subscribe(getHandlesAction(2, stage, mouseObservables, keyboardObservables));
+			var beginTimeout:int = -1;
 			
-			shiftThenMouseDown.
-				filter(function(event:MouseEvent):Boolean {
-					return event.shiftKey && !event.altKey && (event.commandKey || event.controlKey);
-				}).
-				subscribe(getHandlesAction(2, stage, mouseObservables, keyboardObservables, new Point(100, 0)));
+			const mouseObservable:IObservable = mouseMove.
+				merge(mouseDown).
+				takeUntil(mouseUp);
 			
-			shiftThenMouseDown.
-				filter(function(event:MouseEvent):Boolean {
-					return event.shiftKey && event.altKey && !(event.commandKey || event.controlKey);
-				}).
-				subscribe(getHandlesAction(2, stage, mouseObservables, keyboardObservables, null, 'first'));
-			
-			shiftThenMouseDown.
-				filter(function(event:MouseEvent):Boolean {
-					return event.shiftKey && event.altKey && (event.commandKey || event.controlKey);
-				}).
-				subscribe(getHandlesAction(2, stage, mouseObservables, keyboardObservables, null, 'second'));
-		}
-		
-		protected function getHandlesAction(numHandles:int,
-											stage:Stage,
-											mouseObservables:MouseGestures,
-											keyboardObservables:KeyboardGestures,
-											handleOffset:Point = null,
-											moveType:String = 'opposite'):Function
-		{
-			handleOffset ||= new Point();
-			const originalHandleOffset:Point = handleOffset.clone();
-			const originalMoveType:String = moveType;
-			
-			return function(downEvent:MouseEvent):void {
+			const mouseObserver:IObserver = Observer.create(function(event:MouseEvent):void {
 				
-				const shape:Shape = stage.addChild(new Shape()) as Shape;
-				
-//				downEvent.stopImmediatePropagation();
-//				Mouse.hide();
-				
-				shape.graphics.clear();
-				
-				handleOffset = originalHandleOffset.clone();
-				if(originalMoveType == 'opposite')
+				if(realHandle.parent == null)
 				{
-					moveType = Keyboard.capsLock ? 'unison' : 'opposite';
+					stage.addChild(realHandle);
 				}
 				
-				const pos:Point = new Point(stage.mouseX, stage.mouseY);
+				const x:Number = event.stageX;
+				const y:Number = event.stageY;
 				
-				const children:Array = [];
-				const handles:Array = makeHandles(numHandles).
-					map(function(handle:Handle, i:int, ... args):DisplayObject {
+				if(!moved)
+				{
+					realHandle.id = Math.round(Math.random() * 1000);
+				}
+				
+				moved = true;
+				
+				if(multi)
+				{
+					if(control)
+					{
+						mockHandle.x += x - realHandle.x - (mockHandle.width >> 1);
+						mockHandle.y += y - realHandle.y - (mockHandle.height >> 1);
 						
-						const loc:Point = new Point(pos.x + (handleOffset.x * i), pos.y + (handleOffset.y * i));
-						const child:InteractiveObject = toEnumerable(getObjectsUnderPoint(stage, loc)).
-							lastOrDefault(stage) as InteractiveObject;
+						center.x = x + ((mockHandle.x - realHandle.x) >> 1);
+						center.y = y + ((mockHandle.y - realHandle.y) >> 1);
+					}
+					else
+					{
+						mockHandle.x = (2 * center.x) - x - (mockHandle.width >> 1);
+						mockHandle.y = (2 * center.y) - y - (mockHandle.height >> 1);
+					}
+				}
+				
+				realHandle.x = x - (realHandle.width >> 1);
+				realHandle.y = y - (realHandle.height >> 1);
+				
+				if(event.type == MouseEvent.MOUSE_DOWN)
+				{
+					down = true;
+					
+					beginTimeout = setTimeout(function():void {
+						dispatchBeginEvent(realHandle);
 						
-						children[i] = child;
-						
-						if(i == 0 && child is IMultitouchCompliant)
+						if(multi)
 						{
-							const control:InteractiveObject = IMultitouchCompliant(child).relatedControl;
-							if(control)
-							{
-								const controlLocation:Point = control.localToGlobal(new Point(control.width * 0.5, control.height * 0.5));
-								handleOffset.x = controlLocation.x - pos.x;
-								handleOffset.y = controlLocation.y - pos.y;
-							}
+							dispatchBeginEvent(mockHandle);
 						}
 						
-						handle.x = loc.x - (handle.width * 0.5);
-						handle.y = loc.y - (handle.height * 0.5);
+						clearTimeout(beginTimeout);
+						beginTimeout = -1;
+					
+					}, 75);
+				}
+				else if(down)
+				{
+					if(beginTimeout > -1)
+					{
+						clearTimeout(beginTimeout);
+						beginTimeout = -1;
 						
-						const e:TouchEvent = translateTouchEvent(TouchEvent.TOUCH_BEGIN,
-																 downEvent, handle.id, true,
-																 child.globalToLocal(loc),
-																 handle, child);
+						dispatchBeginEvent(realHandle);
 						
-						child.dispatchEvent(e);
-						
-						shape.graphics.beginFill(0xFF0000, 1);
-						shape.graphics.drawCircle(e.stageX, e.stageY, 5);
-						shape.graphics.endFill();
-						
-						return stage.addChild(handle);
-					});
+						if(multi)
+						{
+							dispatchBeginEvent(mockHandle);
+						}
+					}
+					
+					dispatchMoveEvent(realHandle);
+					
+					if(multi && mockHandle.target)
+					{
+						dispatchMoveEvent(mockHandle);
+					}
+				}
 				
-				mouseObservables.mouseMove(stage).
-					takeUntil(mouseObservables.mouseUp(stage)).
-					takeUntil(keyboardObservables.keyUp(stage)).
-					subscribe(function(moveEvent:MouseEvent):void {
+				realHandle.alpha = down ? 1 : 0.5;
+				mockHandle.alpha = down ? 1 : 0.5;
+			},
+			function():void {
+				if(down)
+				{
+					const realHandleLoc:Point = new Point(realHandle.x + (realHandle.width >> 1),
+														  realHandle.y + (realHandle.height >> 1));
+					
+					if(beginTimeout > -1)
+					{
+						clearTimeout(beginTimeout);
+						beginTimeout = -1;
 						
-//						moveEvent.stopImmediatePropagation();
+						dispatchTapEvent(realHandle);
 						
-						shape.graphics.clear();
+						if(multi)
+						{
+							dispatchTapEvent(mockHandle);
+						}
+					}
+					else
+					{
+						dispatchEndEvent(realHandle);
 						
-						handles.forEach(function(handle:Handle, i:int, ... args):void {
-							
-							if(moveType == 'second' && i == 0)
-							{
-								return;
-							}
-							else if(moveType == 'first' && i == 1)
-							{
-								return;
-							}
-							
-							const w:Number = (handle.width * 0.5);
-							const h:Number = (handle.height * 0.5);
-							var child:InteractiveObject = children[i];
-							
-							if(moveType == 'unison')
-							{
-								handle.x += ((pos.x - stage.mouseX) * (i == 0 ? -1 : 1));
-								handle.y = stage.mouseY - h;
-							}
-							else if(moveType == 'opposite')
-							{
-								handle.x += ((pos.x - stage.mouseX) * (i == 0 ? -1 : 1));
-								handle.y += ((pos.y - stage.mouseY) * (i == 0 ? -1 : 1));
-							}
-							else
-							{
-								handle.x = stage.mouseX - w;
-								handle.y = stage.mouseY - h;
-							}
-							
-							const handlePosition:Point = new Point(handle.x + w, handle.y + h);
-							const newChild:InteractiveObject = toEnumerable(getObjectsUnderPoint(stage, handlePosition)).
-								lastOrDefault(stage) as InteractiveObject;
-							var local:Point = child.globalToLocal(handlePosition);
-							
-							if(newChild != child)
-							{
-								child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OUT,
-																		moveEvent, handle.id,
-																		moveType == 'second' ? i == 1 : i == 0,
-																		local, handle, child));
-								if(child is DisplayObjectContainer &&
-									DisplayObjectContainer(child).contains(newChild) == false)
-								{
-									child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_ROLL_OUT,
-																			moveEvent, handle.id,
-																			moveType == 'second' ? i == 1 : i == 0,
-																			local, handle, child));
-									local = newChild.globalToLocal(handlePosition);
-									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OVER,
-																			   moveEvent, handle.id,
-																			   moveType == 'second' ? i == 1 : i == 0,
-																			   local, handle, child));
-									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_ROLL_OVER,
-																			   moveEvent, handle.id,
-																			   moveType == 'second' ? i == 1 : i == 0,
-																			   local, handle, child));
-								}
-								else
-								{
-									newChild.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_OVER,
-																			   moveEvent, handle.id,
-																			   moveType == 'second' ? i == 1 : i == 0,
-																			   local, handle, child));
-								}
-								children[i] = child = newChild;
-							}
-							
-							const e:TouchEvent = translateTouchEvent(TouchEvent.TOUCH_MOVE,
-																	 moveEvent, handle.id,
-																	 moveType == 'second' ? i == 1 : i == 0,
-																	 handlePosition, handle, child);
-							
-							stage.dispatchEvent(e);
-							
-							shape.graphics.beginFill(0xFF0000, 1);
-							shape.graphics.drawCircle(e.stageX, e.stageY, 5);
-							shape.graphics.endFill();
-						});
-						pos.x = stage.mouseX;
-						pos.y = stage.mouseY;
-					},
-					function():void {
-						handles.forEach(function(handle:Handle, i:int, ... args):void {
-							const child:InteractiveObject = children[i];
-							const local:Point = child.globalToLocal(new Point(handle.x + (handle.width * 0.5),
-																			  handle.y + (handle.height * 0.5)));
-							
-							child.dispatchEvent(translateTouchEvent(TouchEvent.TOUCH_END,
-																	new MouseEvent(MouseEvent.MOUSE_UP),
-																	handle.id, moveType == 'second' ? i == 1 : i == 0, local,
-																	handle, child));
-							
-							if(stage.contains(handle))stage.removeChild(handle);
-						});
-						
-						shape.graphics.clear();
-						if(stage.contains(shape))stage.removeChild(shape);
-						handles.length = 0;
-						children.length = 0;
-//						Mouse.show();
-					});
-			};
+						if(multi && mockHandle.target)
+						{
+							dispatchEndEvent(mockHandle);
+						}
+					}
+				}
+				
+				realHandle.id = 0;
+				realHandle.target = null;
+				
+				realHandle.alpha = 0.5;
+				mockHandle.alpha = 0.5;
+				
+				moved = false;
+				down = false;
+				
+				mouseObservable.subscribeWith(mouseObserver);
+			});
+			
+			mouseObservable.subscribeWith(mouseObserver);
+			
+			const keyboardObservable:IObservable = keyDown.filter(function(event:KeyboardEvent):Boolean {
+				return event.keyCode == Keyboard.SHIFT;
+			}).
+			mapMany(function(... args):IObservable {
+				multi = true;
+				
+				stage.addChild(mockHandle);
+				
+				center.x = stage.mouseX;
+				center.y = stage.mouseY;
+				
+				moved = false;
+				mockHandle.id = Math.round(Math.random() * 1000) + 1;
+				
+				mockHandle.x = center.x - (mockHandle.width >> 1);
+				mockHandle.y = center.y - (mockHandle.height >> 1);
+				
+				return Observable.merge([
+										keyDown.filter(function(event:KeyboardEvent):Boolean {
+											return event.keyCode == Keyboard.CONTROL || event.keyCode == Keyboard.COMMAND;
+										}).
+										peek(function(... args):void {
+											control = true;
+										}),
+										keyUp.filter(function(event:KeyboardEvent):Boolean {
+											return event.keyCode == Keyboard.CONTROL || event.keyCode == Keyboard.COMMAND;
+										}).
+										peek(function(... args):void {
+											control = false;
+										})]);
+			}).
+			takeUntil(keyUp.filter(function(event:KeyboardEvent):Boolean {
+				return event.keyCode == Keyboard.SHIFT;
+			}));
+			
+			const keyboardObserver:IObserver = Observer.create(null, function():void {
+				
+				center.x = 0;
+				center.y = 0;
+				multi = false;
+				
+				mockHandle.id = 0;
+				mockHandle.target = null;
+				
+				if(mockHandle.parent)mockHandle.parent.removeChild(mockHandle);
+				
+				keyboardObservable.subscribeWith(keyboardObserver);
+			});
+			
+			keyboardObservable.subscribeWith(keyboardObserver);
 		}
 		
-		protected function makeHandles(handleCount:int):Array
-		{
-			return new Array(handleCount).
-				map(function(... args):DisplayObject {
-					const image:DisplayObject = new Handle(Math.round(Math.random() * 1000) + args[1], new handleImage());
-					image.alpha = 0.7;
-					return image;
-				});
-		}
-		
-		protected static function getObjectsUnderPoint(obj:DisplayObject, pt:Point):Array
+		protected function getObjectsUnderPoint(parent:DisplayObject, location:Point):Array
 		{
 			const a:Array = [];
-			
-			if(obj.visible && obj.hitTestPoint(pt.x, pt.y, !(obj is Stage)))
+			if(parent.visible && parent.hitTestPoint(location.x, location.y, !(parent is Stage)))
 			{
-				if(obj is InteractiveObject && InteractiveObject(obj).mouseEnabled)
-					a.push(obj);
-				
-				const doc:DisplayObjectContainer = obj as DisplayObjectContainer;
-				if(doc && doc.mouseChildren && doc.numChildren)
+				if(parent is InteractiveObject && InteractiveObject(parent).mouseEnabled)
 				{
-					var n:int = doc.numChildren;
-					for(var i:int = 0; i < n; i++)
+					a.push(parent);
+					
+					const doc:DisplayObjectContainer = parent as DisplayObjectContainer;
+					if(doc && doc.mouseChildren && doc.numChildren)
 					{
-						a.push.apply(null, getObjectsUnderPoint(doc.getChildAt(i), pt));
+						const n:int = doc.numChildren;
+						for(var i:int = 0; i < n; ++i)
+						{
+							a.push.apply(null, getObjectsUnderPoint(doc.getChildAt(i), location));
+						}
 					}
 				}
 			}
@@ -301,42 +258,88 @@ package gestures.multitouch
 			return a;
 		}
 		
-		protected function translateTouchEvent(type:String,
-											   event:MouseEvent,
-											   id:int,
-											   primary:Boolean,
-											   local:Point,
-											   handle:DisplayObject,
-											   relatedObject:InteractiveObject):TouchEvent
+		protected function dispatchBeginEvent(handle:Handle):void
+		{
+			const handleLoc:Point = new Point(handle.x + (handle.width >> 1), handle.y + (handle.height >> 1));
+			handle.target = getObjectsUnderPoint(stage, handleLoc).pop() || stage;
+			handle.target.dispatchEvent(createTouchEvent(TouchEvent.TOUCH_BEGIN,
+														 handle.id, true,
+														 handle.target.globalToLocal(handleLoc),
+														 handle, handle.target));
+		}
+		
+		protected function dispatchMoveEvent(handle:Handle):void
+		{
+			const handleLoc:Point = new Point(handle.x + (handle.width >> 1), handle.y + (handle.height >> 1));
+			const target:InteractiveObject = getObjectsUnderPoint(stage, handleLoc).pop() || stage;
+			
+			if(handle.target != target)
+			{
+				handle.target.dispatchEvent(createTouchEvent(TouchEvent.TOUCH_OUT,
+															 handle.id, true,
+															 handle.target.globalToLocal(handleLoc),
+															 handle, handle.target));
+				handle.target = target;
+				handle.target.dispatchEvent(createTouchEvent(TouchEvent.TOUCH_OVER,
+															 handle.id, true,
+															 handle.target.globalToLocal(handleLoc),
+															 handle, handle.target));
+			}
+			
+			handle.target.dispatchEvent(createTouchEvent(TouchEvent.TOUCH_MOVE,
+														 handle.id, true,
+														 handle.target.globalToLocal(handleLoc),
+														 handle, handle.target));
+		}
+		
+		protected function dispatchEndEvent(handle:Handle):void
+		{
+			const handleLoc:Point = new Point(handle.x + (handle.width >> 1), handle.y + (handle.height >> 1));
+			handle.target.dispatchEvent(createTouchEvent(TouchEvent.TOUCH_END,
+														 handle.id, true,
+														 handle.target.globalToLocal(handleLoc),
+														 handle, handle.target));
+		}
+		
+		protected function dispatchTapEvent(handle:Handle):void
+		{
+			const handleLoc:Point = new Point(handle.x + (handle.width >> 1), handle.y + (handle.height >> 1));
+			handle.target = getObjectsUnderPoint(stage, handleLoc).pop() || stage;
+			handle.target.dispatchEvent(createTouchEvent(TouchEvent.TOUCH_TAP,
+														 handle.id, true,
+														 handle.target.globalToLocal(handleLoc),
+														 handle, handle.target));
+		}
+		
+		protected function createTouchEvent(type:String,
+											id:int,
+											primary:Boolean,
+											local:Point,
+											handle:DisplayObject,
+											relatedObject:InteractiveObject):TouchEvent
 		{
 			return new TouchEvent(type,
 								  true, false, id, primary,
 								  local.x, local.y,
 								  handle.width, handle.height, 1,
-								  relatedObject, event.ctrlKey, event.altKey,
-								  event.shiftKey,
-								  event.hasOwnProperty('commandKey') ? event.commandKey : event.ctrlKey,
-								  event.hasOwnProperty('controlKey') ? event.controlKey : event.ctrlKey,
+								  relatedObject,
+								  false, false, false, false, false,
 								  getTimer());
 		}
 	}
 }
 import flash.display.*;
+import flash.events.*;
 
 internal class Handle extends Sprite
 {
-	public function Handle(id:int, child:DisplayObject)
+	public function Handle(child:DisplayObject)
 	{
 		mouseEnabled = false;
 		mouseChildren = false;
-		i = id;
 		addChild(child);
 	}
 	
-	private var i:int = 0;
-	
-	public function get id():int
-	{
-		return i;
-	}
+	public var target:InteractiveObject;
+	public var id:int = 0;
 }

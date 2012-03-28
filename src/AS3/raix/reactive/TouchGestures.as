@@ -30,7 +30,7 @@ package raix.reactive
 	import flash.geom.Rectangle;
 	import flash.utils.*;
 	
-	import gestures.multitouch.ExpandData;
+	import gestures.multitouch.ScaleGestureVO;
 	import gestures.multitouch.TouchPoint;
 	
 	public class TouchGestures extends GesturesBase
@@ -323,108 +323,6 @@ package raix.reactive
 				map(function(both:Array):Array {
 					return both[1];
 				});
-		}
-		
-		public function zoom(target:IEventDispatcher):IObservable
-		{
-			const obs:IObservable = getObs(target, 'zoom');
-			
-			if(obs)
-			{
-				return obs;
-			}
-			
-			var start:Array = [];
-			
-			return cacheObs(target, 'zoom',
-							doubleTouchMove(target).
-							scan(function(both:Array, curr:Array):Array {
-								
-								if(both.length == 0)
-									both = [curr, curr];
-								
-								if(start.length == 0)
-									start = curr.concat();
-								
-								return [both[1], curr];
-							}, [], true).
-							filter(function(both:Array):Boolean {
-								const prev:Array = both[0];
-								const curr:Array = both[1];
-								
-								const p:Point = prev[0].subtract(prev[1]);
-								const c:Point = curr[0].subtract(curr[1]);
-								
-								return (c.length > p.length);
-							}).
-							map(function(both:Array):ExpandData {
-								const curr:Array = both[1];
-								
-								const c1:Point = curr[0];
-								const c2:Point = curr[1];
-								
-								const s1:Point = start[0];
-								const s2:Point = start[1];
-								
-								const delta:Number = c1.subtract(c2).subtract(s1.subtract(s2)).length;
-								
-								return new ExpandData(c1, c2, delta);
-							}).
-							takeUntil(touchEnd(stage)).
-							finallyAction(function():void {
-								start.length = 0;
-							}));
-		}
-		
-		public function pinch(target:IEventDispatcher):IObservable
-		{
-			const obs:IObservable = getObs(target, 'pinch');
-			
-			if(obs)
-			{
-				return obs;
-			}
-			
-			var start:Array = [];
-			
-			return cacheObs(target, 'pinch',
-							doubleTouchMove(target).
-							scan(function(both:Array, curr:Array):Array {
-								
-								if(both.length == 0)
-									both = [curr, curr];
-								
-								if(start.length == 0)
-									start = curr.concat();
-								
-								return [both[1], curr];
-							}, [], true).
-							filter(function(both:Array):Boolean {
-								const prev:Array = both[0];
-								const curr:Array = both[1];
-								
-								const p:Point = prev[0].subtract(prev[1]);
-								const c:Point = curr[0].subtract(curr[1]);
-								
-								return (c.length < p.length);
-							}).
-							map(function(both:Array):ExpandData {
-								const curr:Array = both[1];
-								
-								const c1:Point = curr[0];
-								const c2:Point = curr[1];
-								
-								const s1:Point = start[0];
-								const s2:Point = start[1];
-								
-								const delta:Number = c1.subtract(c2).subtract(s1.subtract(s2)).length;
-								
-								return new ExpandData(c1, c2, delta);
-							}).
-							takeUntil(touchEnd(stage)).
-							finallyAction(function():void {
-								start.length = 0;
-							}));
 		}
 		
 		protected function touchTransaction(target:IEventDispatcher):IObservable
